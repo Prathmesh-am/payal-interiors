@@ -5,7 +5,8 @@ const passport = require('passport');
 const authRoutes = require('./routes/auth.route');
 require('dotenv').config();
 require('./middleware/passportConfig'); // Initialize Passport JWT strategy
-
+const blogRoutes = require('./routes/blog.route');
+const portfolioRoutes = require('./routes/portfolio.route');
 const app = express();
 
 app.use(cookieParser());
@@ -17,7 +18,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', authRoutes); 
-
+app.use('/blogs', blogRoutes);
+app.use('/portfolios', portfolioRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {

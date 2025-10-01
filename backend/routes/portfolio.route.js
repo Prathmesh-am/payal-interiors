@@ -2,10 +2,9 @@ const express = require('express');
 const fs = require('fs').promises;
 const router = express.Router();
 const passport = require('passport');
-const Portfolio = require('./../model/portfolioModel'); // Make sure the path is correct
-const { createUploader } = require('../utils/multerConfig'); // Make sure the path is correct
+const Portfolio = require('./../model/portfolioModel'); 
+const { createUploader } = require('../utils/multerConfig'); 
 
-// Create an uploader instance specifically for portfolio images
 const portfolioUploader = createUploader('uploads/portfolios');
 
 // Middleware to check if the authenticated user is an admin
@@ -16,14 +15,13 @@ const checkAdmin = (req, res, next) => {
   next();
 };
 
-// --------------------- CREATE PORTFOLIO PROJECT ---------------------
 router.post(
   '/create',
   passport.authenticate('jwt', { session: false }),
   checkAdmin,
   portfolioUploader.fields([
     { name: 'coverImage', maxCount: 1 },
-    { name: 'images', maxCount: 10 }, // Allow more images for a portfolio
+    { name: 'images', maxCount: 10 }, 
   ]),
   async (req, res) => {
     try {
@@ -34,7 +32,7 @@ router.post(
         projectType,
         styles,
         rooms,
-        clientName,
+        clientName, 
         status,
         projectDate,
         location,
@@ -79,7 +77,6 @@ router.post(
   }
 );
 
-// --------------------- GET ALL PUBLISHED PORTFOLIO PROJECTS ---------------------
 router.get('/getportfolios', async (req, res) => {
   try {
     const portfolios = await Portfolio.find({ status: 'published' })
@@ -91,7 +88,7 @@ router.get('/getportfolios', async (req, res) => {
   }
 });
 
-// --------------------- GET A SINGLE PORTFOLIO PROJECT BY SLUG ---------------------
+
 router.get('/:slug', async (req, res) => {
   try {
     const portfolio = await Portfolio.findOne({ slug: req.params.slug }).populate('author', 'name email');
@@ -112,7 +109,7 @@ router.get('/:slug', async (req, res) => {
   }
 });
 
-// --------------------- UPDATE PORTFOLIO PROJECT ---------------------
+
 router.put(
   '/:slug',
   passport.authenticate('jwt', { session: false }),
@@ -186,7 +183,7 @@ router.put(
   }
 );
 
-// --------------------- DELETE PORTFOLIO PROJECT ---------------------
+
 router.delete(
   '/:slug',
   passport.authenticate('jwt', { session: false }),

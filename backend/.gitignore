@@ -32,3 +32,4 @@ log/
 *.log
 *.sqlite
 *.sqlite3
+uploads/

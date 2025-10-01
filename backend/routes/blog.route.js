@@ -1,3 +1,4 @@
+const fs = require('fs').promises;
 const express = require('express');
 const router = express.Router();
 const passport = require('passport');
@@ -15,7 +16,6 @@ const checkAdmin = (req, res, next) => {
   next();
 };
 
-// --------------------- CREATE BLOG ---------------------
 router.post(
   '/create',
   passport.authenticate('jwt', { session: false }),
@@ -56,8 +56,7 @@ router.post(
   }
 );
 
-// --------------------- GET ALL PUBLISHED BLOGS ---------------------
-router.get('/getblogs', async (req, res) => {
+router.get('/getblogs',   passport.authenticate('jwt', { session: false }),async (req, res) => {
   try {
     const blogs = await Blog.find({ status: 'published' })
       .populate('author', 'name email')
@@ -68,8 +67,7 @@ router.get('/getblogs', async (req, res) => {
   }
 });
 
-// --------------------- GET SINGLE BLOG BY SLUG ---------------------
-router.get('/:slug', async (req, res) => {
+router.get('/:slug',  passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const blog = await Blog.findOne({ slug: req.params.slug }).populate('author', 'name email');
     if (!blog) return res.status(404).json({ message: 'Blog not found' });
@@ -84,7 +82,6 @@ router.get('/:slug', async (req, res) => {
   }
 });
 
-// --------------------- UPDATE BLOG ---------------------
 router.put(
   '/:slug',
   passport.authenticate('jwt', { session: false }),
@@ -135,7 +132,6 @@ router.put(
   }
 );
 
-// --------------------- DELETE BLOG ---------------------
 router.delete(
   '/:slug',
   passport.authenticate('jwt', { session: false }),
