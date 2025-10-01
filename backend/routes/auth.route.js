@@ -64,4 +64,9 @@ router.get('/profile', passport.authenticate('jwt', { session: false }), (req, r
   res.json({ user: { id: req.user._id, name: req.user.name, email: req.user.email, role: req.user.role } });
 });
 
+router.post('/logout', (req, res) => {
+  res.clearCookie('jwt');
+  res.json({ message: 'Logged out successfully' });
+});
+
 module.exports = router;
