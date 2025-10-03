@@ -2,7 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Create uploads folder if it doesn't exist
+// Create uploads folder if not exists
 const ensureUploadsFolder = (folderPath) => {
   if (!fs.existsSync(folderPath)) {
     fs.mkdirSync(folderPath, { recursive: true });
@@ -14,7 +14,7 @@ const createStorage = (folder) => {
   ensureUploadsFolder(folder);
   return multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, folder);
+      cb(null, path.join(folder, 'original')); // always upload to original first
     },
     filename: (req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -33,16 +33,16 @@ const imageFileFilter = (req, file, cb) => {
   }
 };
 
-// Multer instance factory
 const createUploader = (folder, options = {}) => {
+  ensureUploadsFolder(path.join(folder, 'original')); // ensure original folder exists
   const storage = createStorage(folder);
   return multer({
     storage,
     fileFilter: options.fileFilter || imageFileFilter,
-    limits: options.limits || { fileSize: 5 * 1024 * 1024 } // 5MB default
+    limits: options.limits || { fileSize: 5 * 1024 * 1024 }
   });
 };
 
 module.exports = {
-  createUploader
+  createUploader,
 };

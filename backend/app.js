@@ -1,23 +1,23 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
-const { connectDB } = require('./utils/database');
+const { connectDB } = require('./src/utils/database');
 const passport = require('passport');
-const authRoutes = require('./routes/auth.route');
+const userRoute = require('./src/routes/user.route');
 require('dotenv').config();
-require('./middleware/passportConfig'); // Initialize Passport JWT strategy
-const blogRoutes = require('./routes/blog.route');
-const portfolioRoutes = require('./routes/portfolio.route');
+require('./src/middleware/passportConfig'); // Initialize Passport JWT strategy
+const blogRoutes = require('./src/routes/blog.route');
+const portfolioRoutes = require('./src/routes/portfolio.route');
 const app = express();
 
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(passport.initialize());
 
 app.get('/', (req, res) => {
-  res.json({ message: 'Server is running!' });
+  return res.json({ message: 'Server is running!' });
 });
 
-app.use('/auth', authRoutes); 
+app.use('/user', userRoute);
 app.use('/blogs', blogRoutes);
 app.use('/portfolios', portfolioRoutes);
 

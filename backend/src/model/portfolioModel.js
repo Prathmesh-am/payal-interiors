@@ -12,31 +12,39 @@ const portfolioSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    author: {  // reference to the designer (user)
+    author: { 
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
-    description: {  
-      type: String,
-      required: true,
-    },
+
+excerpt:{
+    type: String, // short summary of the blog
+  },
+  content:{
+     type: String,
+     required: true,
+  },
     projectType: { // e.g., Residential, Commercial, Office, Kitchen
       type: String,
       required: true,
     },
-    styles: [String], // e.g., Modern, Minimalist, Rustic
-    rooms: [String],  // e.g., Living Room, Bedroom, Kitchen
-    coverImage: {    
+    featuredImage: {    // featured image
       type: String,
     },
-    images: [String],
-    clientName: {  
+    images: [
+      {
+        title: { type: String, required: true },
+        description: { type: String, required: true },
+        path: { type: String, required: true },
+      },
+    ],
+    clientName: {
       type: String,
     },
     status: {
       type: String,
-      enum: ['draft', 'published', 'archived'],
+      enum: ['draft', 'published', 'archived', 'scheduled'],
       default: 'draft',
     },
     projectDate: { 

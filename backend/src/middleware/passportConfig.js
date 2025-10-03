@@ -1,7 +1,8 @@
 const passport = require('passport');
 const JwtStrategy = require('passport-jwt').Strategy;
-const User = require('./../model/userModel');
-
+const User = require('../model/userModel');
+const dotenv = require('dotenv');
+dotenv.config();
 const cookieExtractor = (req) => {
   let token = null;
   if (req && req.cookies) {
@@ -29,4 +30,5 @@ passport.use(
   })
 );
 
-module.exports = passport;
+const isAuthenticated = passport.authenticate('jwt', { session: false });
+module.exports = { isAuthenticated };
