@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+const imageSchema = new mongoose.Schema({
+  original: String,
+  thumbnail: String,
+  small: String,
+  medium: String,
+  large: String
+}, { _id: false });
+
 const portfolioSchema = new mongoose.Schema(
   {
     title: {
@@ -29,14 +37,12 @@ excerpt:{
       type: String,
       required: true,
     },
-    featuredImage: {    // featured image
-      type: String,
-    },
+    featuredImage: imageSchema,
     images: [
       {
-        title: { type: String, required: true },
-        description: { type: String, required: true },
-        path: { type: String, required: true },
+        title: { type: String,  },
+        description: { type: String,  },
+        path: imageSchema,
       },
     ],
     clientName: {

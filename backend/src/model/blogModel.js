@@ -18,7 +18,6 @@ const blogSchema = new mongoose.Schema({
   },
   excerpt:{
     type: String, // short summary of the blog
-  
   },
   content: {           
     type: String,

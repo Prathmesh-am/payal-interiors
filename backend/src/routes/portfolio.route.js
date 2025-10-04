@@ -1,11 +1,10 @@
 const express = require('express');
-
 const router = express.Router();
 const { createUploader } = require('../utils/multerConfig');
 const checkAdmin = require('../middleware/checkRole');
 const { isAuthenticated } = require('../middleware/passportConfig');
 const { createPortfolio, getPortfolio, getPortfolioBySlug, updatePortfolio, deletePortfolio } = require('../controller/portfolio.controller');
-const portfolioUploader = createUploader('uploads/portfolios');
+const portfolioUploader = createUploader('uploads/portfolio');
 
 
 router.post(
@@ -13,7 +12,7 @@ router.post(
   isAuthenticated,
   checkAdmin,
   portfolioUploader.fields([
-    { name: 'coverImage', maxCount: 1 },
+    { name: 'featuredImage', maxCount: 1 },
     { name: 'images', maxCount: 10 },
   ]),
   createPortfolio
@@ -28,7 +27,7 @@ router.put(
   isAuthenticated,
   checkAdmin,
   portfolioUploader.fields([
-    { name: 'coverImage', maxCount: 1 },
+    { name: 'featuredImage', maxCount: 1 },
     { name: 'images', maxCount: 10 },
   ]),
 updatePortfolio

@@ -4,40 +4,44 @@ const path = require('path');
 const fs = require('fs');
 
 const ensureDir = (dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 };
 
-const resizeAndSave = async (filePath, filename, baseFolder) => {
-  const sizes = {
-    thumbnail: 150,
-    small: 300,
-    medium: 600,
-    large: 1200,
+const sizes = {
+  thumbnail: 64,
+  small: 256,
+  medium: 512,
+  large: 1024
+};
+
+/**
+ * Resize and save images into multiple sizes
+ * @param {string} filePath - path of uploaded file
+ * @param {string} filename - name of the file
+ * @param {string} folderName - "blog" | "portfolio" etc.
+ */
+const resizeAndSave = async (filePath, filename, folderName) => {
+  if (!fs.existsSync(filePath)) throw new Error('Original file not found: ' + filePath);
+
+  const baseFolder = path.join(process.cwd(), 'uploads', folderName);
+
+  // Ensure size folders exist
+  Object.keys(sizes).forEach((k) => ensureDir(path.join(baseFolder, k)));
+  ensureDir(path.join(baseFolder, 'original'));
+
+  const paths = {
+    original: `/uploads/${folderName}/original/${filename}`
   };
 
-  const imagePaths = {
-    original: `/uploads/blog/original/${filename}`,
-  };
-
-  // 🔑 important: run all sharp tasks in parallel
   await Promise.all(
     Object.entries(sizes).map(async ([key, width]) => {
-      const outputDir = path.join(baseFolder, key);
-      ensureDir(outputDir);
-
-      const outputPath = path.join(outputDir, filename);
-
-      await sharp(filePath)
-        .resize({ width, withoutEnlargement: true }) // prevent enlarging
-        .toFile(outputPath);
-
-      imagePaths[key] = `/uploads/blog/${key}/${filename}`;
+      const outPath = path.join(baseFolder, key, filename);
+      await sharp(filePath).resize({ width, withoutEnlargement: true }).toFile(outPath);
+      paths[key] = `/uploads/${folderName}/${key}/${filename}`;
     })
   );
 
-  return imagePaths;
+  return paths;
 };
 
 module.exports = { resizeAndSave };

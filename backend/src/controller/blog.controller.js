@@ -9,19 +9,18 @@ const createBlog = async (req, res) => {
     const { title, slug, content, tags, categories, excerpt, status, publishedAt } = req.body;
 
     const existingBlog = await Blog.findOne({ slug });
-    if (existingBlog) return res.status(400).json({ message: 'Slug already exists' });
+    if (existingBlog) {
+      return res.status(400).json({ message: 'Slug already exists' });
+    }
 
     let featuredImage = null;
-    console.log(req.files['featuredImage']);
+
 
     if (req.files['featuredImage']?.[0]) {
       const file = req.files['featuredImage'][0];
-      const filePath = file.path;
-      const filename = path.basename(filePath);
-      const folder = path.resolve('uploads/blog');
+      const filename = path.basename(file.path);
 
-      // ✅ create multiple sizes
-      featuredImage = await resizeAndSave(filePath, filename, folder);
+      featuredImage = await resizeAndSave(file.path, filename, 'blog');
     }
 
     const blog = new Blog({
@@ -32,16 +31,21 @@ const createBlog = async (req, res) => {
       excerpt,
       tags: tags ? JSON.parse(tags) : [],
       categories: categories ? JSON.parse(categories) : [],
-      featuredImage,
+      featuredImage, // object with all paths
       status: status || 'draft',
       publishedAt: publishedAt || (status === 'published' ? new Date() : null),
     });
 
     await blog.save();
+
     const populatedBlog = await Blog.findById(blog._id).populate('author', 'name email');
 
-    return res.status(201).json({ message: 'Blog created', blog: populatedBlog });
+    return res.status(201).json({
+      message: 'Blog created',
+      blog: populatedBlog,
+    });
   } catch (error) {
+    console.error('createBlog error:', error);
     return res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -102,7 +106,7 @@ const updateBlog = async (req, res) => {
         deleteOldBlogImages(oldBlog.featuredImage);
       }
 
-      const newPaths = await resizeAndSave(file.path, filename, baseFolder);
+      const newPaths = await resizeAndSave(file.path, filename, 'blog');
       updateData.featuredImage = newPaths; // store all paths
     }
 
@@ -128,45 +132,43 @@ const updateBlog = async (req, res) => {
 
 const deleteBlog = async (req, res) => {
   try {
-    // Step 1: Find the blog post to get its file paths before deleting
     const blog = await Blog.findOne({ slug: req.params.slug });
 
     if (!blog) {
       return res.status(404).json({ message: 'Blog not found' });
     }
 
-    // Step 2: Collect the paths of the cover image and any other images
     const filesToDelete = [];
-    if (blog.coverImage) {
-      filesToDelete.push(blog.coverImage);
-    }
-    if (blog.images && blog.images.length > 0) {
-      filesToDelete.push(...blog.images);
+    if (blog.featuredImage && typeof blog.featuredImage === 'object') {
+      filesToDelete.push(...Object.values(blog.featuredImage));
     }
 
-    // Step 3: Delete the collected files from the server's filesystem
     if (filesToDelete.length > 0) {
-      await Promise.allSettled(
-        filesToDelete.map(filePath => fs.unlink(filePath))
-      ).then(results => {
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            // This is useful for debugging if a file doesn't exist but the DB record does
-            console.error(`Failed to delete file: ${filesToDelete[index]}`, result.reason);
-          }
-        });
+      const results = await Promise.allSettled(
+        filesToDelete.map(relativeUrlPath => {
+          // 👇 Step 2: Construct the correct absolute path
+       
+          const absolutePath = path.join(process.cwd(), relativeUrlPath);
+          return fs.unlink(absolutePath);
+        })
+      );
+
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`Failed to delete file: ${filesToDelete[index]}`, result.reason);
+        }
       });
     }
 
-    // Step 4: Now, delete the blog post from the database
     await Blog.findByIdAndDelete(blog._id);
 
-    return res.json({ message: 'Blog and associated files deleted successfully' });
+    return res.status(200).json({ message: 'Blog and associated images deleted successfully' });
 
   } catch (error) {
+    console.error('Error deleting blog:', error);
     return res.status(500).json({ message: 'Server error', error: error.message });
   }
-}
+};
 
 module.exports = {
   createBlog,

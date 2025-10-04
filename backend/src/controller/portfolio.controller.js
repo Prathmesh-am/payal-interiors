@@ -1,59 +1,88 @@
 const Portfolio = require('./../model/portfolioModel');
 const fs = require('fs').promises;
- const createPortfolio = async (req, res) => {
-     try {
-          const {
-               title,
-               slug,
-               description,
-               projectType,
-               styles,
-               rooms,
-               clientName,
-               status,
-               projectDate,
-               location,
-          } = req.body;
+const { resizeAndSave } = require('../utils/imageResizer');
+const path = require('path');
 
-          // Check if the slug is unique
-          const existingPortfolio = await Portfolio.findOne({ slug });
-          if (existingPortfolio) {
-               return res.status(400).json({ message: 'This slug is already in use.' });
-          }
+const createPortfolio = async (req, res) => {
+  try {
+    const {
+      title,
+      slug,
+      content,
+      projectType,
+      excerpt,
+      clientName,
+      status,
+      projectDate,
+      location,
+    } = req.body;
 
-          // Get file paths from multer
-          const coverImage = req.files['coverImage']?.[0].path;
-          const images = req.files['images']?.map(file => file.path) || [];
+    
+    const existingPortfolio = await Portfolio.findOne({ slug });
+    if (existingPortfolio) {
+      return res.status(400).json({ message: 'This slug is already in use.' });
+    }
 
-          const portfolio = new Portfolio({
-               title,
-               slug,
-               author: req.user._id, // Assign the logged-in admin/user as the author
-               description,
-               projectType,
-               styles: styles ? JSON.parse(styles) : [], // Expecting a JSON string array
-               rooms: rooms ? JSON.parse(rooms) : [],   // Expecting a JSON string array
-               clientName,
-               status: status || 'draft',
-               projectDate,
-               location,
-               coverImage,
-               images,
-          });
+    let featuredImage = null;
+    let images = [];
 
-          await portfolio.save();
+    
+    if (req.files['featuredImage']?.[0]) {
+      const file = req.files['featuredImage'][0];
+      const filename = path.basename(file.path);
+      featuredImage = await resizeAndSave(file.path, filename, 'portfolio');
+    }
 
-          // Populate author details before sending the response
-          const populatedPortfolio = await Portfolio.findById(portfolio._id).populate('author', 'name email');
+  
+    const galleryFiles = req.files['images'] || [];
+    for (const file of galleryFiles) {
+      const filename = path.basename(file.path);
+      const optimizedPaths = await resizeAndSave(file.path, filename, 'portfolio');
 
-          return res.status(201).json({ message: 'Portfolio project created successfully', portfolio: populatedPortfolio });
+      const imageData = {
+        title: file.originalname, // can be overridden by frontend field
+        description: 'this is description',          // can be filled by frontend
+        path: optimizedPaths,
+      };
 
-     } catch (error) {
-          return res.status(500).json({ message: 'An error occurred on the server', error: error.message });
-     }
-}
+      images.push(imageData);
+    }
 
- const getPortfolio = async (req, res) => {
+    const portfolio = new Portfolio({
+      title,
+      slug,
+      author: req.user._id,
+      content,
+      excerpt,
+      projectType,
+      featuredImage,
+      images,
+      clientName,
+      status: status || 'draft',
+      projectDate,
+      location,
+    });
+
+    await portfolio.save();
+
+    const populatedPortfolio = await Portfolio.findById(portfolio._id)
+      .populate('author', 'name email');
+
+    return res.status(201).json({
+      message: 'Portfolio project created successfully',
+      portfolio: populatedPortfolio,
+    });
+
+  } catch (error) {
+    console.error('createPortfolio error:', error);
+    return res.status(500).json({
+      message: 'An error occurred on the server',
+      error: error.message,
+    });
+  }
+};
+
+const getPortfolio = async (req, res) => {
      try {
           const portfolios = await Portfolio.find({ status: 'published' })
                .populate('author', 'name email') // Show author's name and email
@@ -64,7 +93,7 @@ const fs = require('fs').promises;
      }
 }
 
- const getPortfolioBySlug = async (req, res) => {
+const getPortfolioBySlug = async (req, res) => {
      try {
           const portfolio = await Portfolio.findOne({ slug: req.params.slug }).populate('author', 'name email');
 
@@ -84,117 +113,237 @@ const fs = require('fs').promises;
      }
 }
 
- const updatePortfolio = async (req, res) => {
-     try {
-          const {
-               title,
-               slug,
-               description,
-               projectType,
-               styles,
-               rooms,
-               clientName,
-               status,
-               projectDate,
-               location,
-          } = req.body;
+const updatePortfolio = async (req, res) => {
+  try {
+    const {
+      title,
+      slug,
+      description,
+      projectType,
+      styles,
+      rooms,
+      clientName,
+      status,
+      projectDate,
+      location,
+    } = req.body;
 
-          // If slug is being changed, check if the new one is unique
-          if (slug && slug !== req.params.slug) {
-               const existingPortfolio = await Portfolio.findOne({ slug });
-               if (existingPortfolio) {
-                    return res.status(400).json({ message: 'This slug is already in use.' });
-               }
+    // Find the existing portfolio
+    const existingPortfolio = await Portfolio.findOne({ slug: req.params.slug });
+    if (!existingPortfolio) {
+      return res.status(404).json({ message: 'Portfolio project not found' });
+    }
+
+    // If slug is being changed, check if the new one is unique
+    if (slug && slug !== req.params.slug) {
+      const slugExists = await Portfolio.findOne({ slug });
+      if (slugExists) {
+        return res.status(400).json({ message: 'This slug is already in use.' });
+      }
+    }
+
+    // Convert to plain object
+    const portfolioData = existingPortfolio.toObject();
+    const filesToDelete = [];
+
+    // Collect old image paths to delete
+    if (req.files['featuredImage'] && portfolioData.featuredImage && typeof portfolioData.featuredImage === 'object') {
+      Object.values(portfolioData.featuredImage).forEach(value => {
+        if (typeof value === 'string' && value.trim() !== '') {
+          filesToDelete.push(value);
+        }
+      });
+    }
+
+    if (req.files['images'] && portfolioData.images && Array.isArray(portfolioData.images)) {
+      portfolioData.images.forEach(image => {
+        if (image.path && typeof image.path === 'object') {
+          Object.values(image.path).forEach(value => {
+            if (typeof value === 'string' && value.trim() !== '') {
+              filesToDelete.push(value);
+            }
+          });
+        }
+      });
+    }
+
+    // Delete old files
+    if (filesToDelete.length > 0) {
+      const baseDir = path.join(process.cwd());
+      const results = await Promise.allSettled(
+        filesToDelete.map(async (relativeUrlPath) => {
+          if (typeof relativeUrlPath !== 'string') {
+            throw new Error(`Invalid path detected: ${relativeUrlPath}`);
           }
+          const cleanPath = relativeUrlPath.startsWith('/') ? relativeUrlPath.slice(1) : relativeUrlPath;
+          const absolutePath = path.join(baseDir, cleanPath);
+          await fs.access(absolutePath);
+          await fs.unlink(absolutePath);
+        })
+      );
 
-          const updateData = {
-               title,
-               slug,
-               description,
-               projectType,
-               styles: styles ? JSON.parse(styles) : undefined,
-               rooms: rooms ? JSON.parse(rooms) : undefined,
-               clientName,
-               status,
-               projectDate,
-               location,
+      const failedDeletions = results.filter(result => result.status === 'rejected');
+      if (failedDeletions.length > 0) {
+        console.error('Some files failed to delete:', failedDeletions.map((r, i) => ({
+          file: filesToDelete[i],
+          error: r.reason.message,
+        })));
+        return res.status(500).json({
+          message: 'Portfolio update failed due to file deletion errors',
+          errors: failedDeletions.map((r, i) => ({
+            file: filesToDelete[i],
+            error: r.reason.message,
+          })),
+        });
+      }
+    }
+
+    // Prepare update data
+    const updateData = {
+      title,
+      slug,
+      description,
+      projectType,
+      styles: styles ? JSON.parse(styles) : undefined,
+      rooms: rooms ? JSON.parse(rooms) : undefined,
+      clientName,
+      status,
+      projectDate,
+      location,
+    };
+
+    // Process new featuredImage
+    if (req.files['featuredImage']) {
+      const originalPath = req.files['featuredImage'][0].path;
+      const fileName = path.basename(originalPath);
+      updateData.featuredImage = await resizeAndSave(
+        path.join(process.cwd(), originalPath.startsWith('/') ? originalPath.slice(1) : originalPath),
+        fileName,
+        'portfolio'
+      );
+    }
+
+    // Process new images
+    if (req.files['images']) {
+      updateData.images = await Promise.all(
+        req.files['images'].map(async file => {
+          const originalPath = file.path;
+          const fileName = path.basename(originalPath);
+          const resizedPaths = await resizeAndSave(
+            path.join(process.cwd(), originalPath.startsWith('/') ? originalPath.slice(1) : originalPath),
+            fileName,
+            'portfolio'
+          );
+          return {
+            title: file.originalname,
+            description: '', // Adjust if descriptions are provided
+            path: resizedPaths,
           };
+        })
+      );
+    }
 
-          // Check for and add new file paths if they were uploaded
-          if (req.files['coverImage']) {
-               updateData.coverImage = req.files['coverImage'][0].path;
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+    // Update the portfolio
+    const updatedPortfolio = await Portfolio.findOneAndUpdate(
+      { slug: req.params.slug },
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).populate('author', 'name email');
+
+    if (!updatedPortfolio) {
+      return res.status(404).json({ message: 'Portfolio project not found' });
+    }
+
+    return res.json({ message: 'Portfolio project updated successfully', portfolio: updatedPortfolio });
+
+  } catch (error) {
+    console.error('Error updating portfolio:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const deletePortfolio = async (req, res) => {
+  try {
+    const portfolio = await Portfolio.findOne({ slug: req.params.slug });
+
+    if (!portfolio) {
+      return res.status(404).json({ message: 'Portfolio project not found' });
+    }
+
+    const portfolioData = portfolio.toObject();
+    const filesToDelete = [];
+
+    // Process featuredImage paths
+    if (portfolioData.featuredImage && typeof portfolioData.featuredImage === 'object' && portfolioData.featuredImage !== null) {
+      Object.values(portfolioData.featuredImage).forEach(value => {
+        if (typeof value === 'string' && value.trim() !== '') {
+          filesToDelete.push(value);
+        }
+      });
+    }
+
+    // Process images array paths
+    if (portfolioData.images && Array.isArray(portfolioData.images)) {
+      portfolioData.images.forEach(image => {
+        if (image.path && typeof image.path === 'object' && image.path !== null) {
+          Object.values(image.path).forEach(value => {
+            if (typeof value === 'string' && value.trim() !== '') {
+              filesToDelete.push(value);
+            }
+          });
+        }
+      });
+    }
+
+    // Delete files if any exist
+    if (filesToDelete.length > 0) {
+      const baseDir = path.join(process.cwd());
+      const results = await Promise.allSettled(
+        filesToDelete.map(async (relativeUrlPath) => {
+          if (typeof relativeUrlPath !== 'string') {
+            throw new Error(`Invalid path detected: ${relativeUrlPath}`);
           }
-          if (req.files['images']) {
-               updateData.images = req.files['images'].map(file => file.path);
-          }
+          const cleanPath = relativeUrlPath.startsWith('/') ? relativeUrlPath.slice(1) : relativeUrlPath;
+          const absolutePath = path.join(baseDir, cleanPath);
+          await fs.access(absolutePath);
+          await fs.unlink(absolutePath);
+        })
+      );
 
-          // Remove any fields that were not provided in the request
-          Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+      const failedDeletions = results.filter(result => result.status === 'rejected');
+      if (failedDeletions.length > 0) {
+        console.error('Some files failed to delete:', failedDeletions.map((r, i) => ({
+          file: filesToDelete[i],
+          error: r.reason.message,
+        })));
+        return res.status(500).json({
+          message: 'Portfolio deleted, but some files could not be deleted',
+          errors: failedDeletions.map((r, i) => ({
+            file: filesToDelete[i],
+            error: r.reason.message,
+          })),
+        });
+      }
+    }
 
-          const updatedPortfolio = await Portfolio.findOneAndUpdate(
-               { slug: req.params.slug },
-               { $set: updateData },
-               { new: true, runValidators: true } // Return the updated document
-          ).populate('author', 'name email');
+    // Delete the database document
+    await Portfolio.findByIdAndDelete(portfolio._id);
 
-          if (!updatedPortfolio) {
-               return res.status(404).json({ message: 'Portfolio project not found' });
-          }
+    return res.status(200).json({ message: 'Portfolio project and associated images deleted successfully' });
 
-          return res.json({ message: 'Portfolio project updated successfully', portfolio: updatedPortfolio });
-
-     } catch (error) {
-          return res.status(500).json({ message: 'An error occurred on the server', error: error.message });
-     }
-}
-
- const deletePortfolio = async (req, res) => {
-     try {
-          // Step 1: Find the document first to get the file paths
-          const portfolio = await Portfolio.findOne({ slug: req.params.slug });
-
-          if (!portfolio) {
-               return res.status(404).json({ message: 'Portfolio project not found' });
-          }
-
-          // Step 2: Gather all file paths into a single array
-          const filesToDelete = [];
-          if (portfolio.coverImage) {
-               filesToDelete.push(portfolio.coverImage);
-          }
-          if (portfolio.images && portfolio.images.length > 0) {
-               filesToDelete.push(...portfolio.images);
-          }
-
-          // Step 3: Attempt to delete the files from the filesystem
-          if (filesToDelete.length > 0) {
-               // Promise.allSettled allows us to attempt all deletions, even if some fail
-               await Promise.allSettled(
-                    filesToDelete.map(filePath => fs.unlink(filePath))
-               ).then(results => {
-                    results.forEach((result, index) => {
-                         if (result.status === 'rejected') {
-                              // Log an error if a file couldn't be deleted (e.g., it doesn't exist)
-                              console.error(`Failed to delete file: ${filesToDelete[index]}`, result.reason);
-                         }
-                    });
-               });
-          }
-
-          // Step 4: Delete the document from the database
-          await Portfolio.findByIdAndDelete(portfolio._id);
-
-          return res.json({ message: 'Portfolio project and associated files deleted successfully' });
-
-     } catch (error) {
-          return res.status(500).json({ message: 'An error occurred on the server', error: error.message });
-     }
-}
+  } catch (error) {
+    console.error('Error deleting portfolio:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
 
 module.exports = {
-  createPortfolio,
-  getPortfolio,     
-  getPortfolioBySlug,
-  updatePortfolio,
-  deletePortfolio
+     createPortfolio,
+     getPortfolio,
+     getPortfolioBySlug,
+     updatePortfolio,
+     deletePortfolio
 };
