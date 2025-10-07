@@ -14,7 +14,7 @@ const createStorage = (folder) => {
   ensureUploadsFolder(folder);
   return multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, path.join(folder, 'original')); // always upload to original first
+      cb(null, path.join(folder, 'original')); 
     },
     filename: (req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -34,7 +34,7 @@ const imageFileFilter = (req, file, cb) => {
 };
 
 const createUploader = (folder, options = {}) => {
-  ensureUploadsFolder(path.join(folder, 'original')); // ensure original folder exists
+  ensureUploadsFolder(path.join(folder, 'original')); 
   const storage = createStorage(folder);
   return multer({
     storage,

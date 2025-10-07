@@ -25,14 +25,20 @@ const blogSchema = new mongoose.Schema({
   },
 
   tags: [String],            
-  categories: [String],     // another schema can be created for categories if needed
- featuredImage: {
-  original: { type: String },
-  thumbnail: { type: String },
-  small: { type: String },
-  medium: { type: String },
-  large: { type: String }
-},
+  categories: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category'
+  }],    
+  featuredImage: {
+    mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media' },
+    versions: {
+      original: String,
+      thumbnail: String,
+      small: String,
+      medium: String,
+      large: String
+    }
+  },
   status: {               
     type: String,
     enum: ['draft', 'published', 'archived', 'scheduled'],

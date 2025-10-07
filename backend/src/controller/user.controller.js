@@ -12,13 +12,13 @@ const jwt = require('jsonwebtoken');
           await user.save();
 
           const payload = { id: user._id, role: user.role };
-          const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+          const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7h' });
 
           // Set cookie
           res.cookie('jwt', token, {
                httpOnly: true,
                sameSite: 'strict',
-               maxAge: 3600000 // 1 hour
+               maxAge: 25200000 // 7 hours
           });
 
           return res.status(201).json({ message: 'User registered successfully' });
@@ -41,12 +41,12 @@ const jwt = require('jsonwebtoken');
           }
 
           const payload = { id: user._id, role: user.role };
-          const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+          const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7h' });
 
           res.cookie('jwt', token, {
                httpOnly: true,
                sameSite: 'strict',
-               maxAge: 3600000 // 1 hour in milliseconds
+               maxAge: 25200000 // 7 hours in milliseconds
           });
 
           return res.json({ message: 'Login successful' });
